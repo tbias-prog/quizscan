@@ -8,6 +8,42 @@ const app = express();
 
 app.use(express.json({ limit: '10mb' }));
 
+const callGemini = async (payload: any, apiKey: string, maxRetries = 2) => {
+  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  let lastError = null;
+
+  for (const model of models) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const fetchResponse = await fetch(fetchUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (fetchResponse.ok) {
+        return await fetchResponse.json();
+      }
+
+      const errText = await fetchResponse.text();
+      const status = fetchResponse.status;
+
+      if (status === 503 || status === 429) {
+        lastError = new Error(`Gemini API Error: ${status} - ${errText}`);
+        if (attempt < maxRetries) {
+          await new Promise(res => setTimeout(res, 1000 * Math.pow(2, attempt)));
+        }
+        continue;
+      } else {
+        throw new Error(`Gemini API Error: ${status} - ${errText}`);
+      }
+    }
+  }
+  throw lastError || new Error("Failed to call Gemini API after all retries and model fallbacks.");
+};
+
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -115,7 +151,6 @@ app.post("/api/grade", async (req, res) => {
       }
     `;
 
-    const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const payload = {
       contents: [
         {
@@ -137,20 +172,7 @@ app.post("/api/grade", async (req, res) => {
       }
     };
 
-    const fetchResponse = await fetch(fetchUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!fetchResponse.ok) {
-      const errText = await fetchResponse.text();
-      throw new Error(`Gemini API Error: ${fetchResponse.status} - ${errText}`);
-    }
-
-    const data: any = await fetchResponse.json();
+    const data: any = await callGemini(payload, apiKey);
     const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     const gradingResult = JSON.parse(textResponse);
     res.json(gradingResult);
@@ -193,7 +215,6 @@ app.post("/api/parse-key", async (req, res) => {
       Return ONLY the plain text of the extracted keys, no conversational filler.
     `;
 
-    const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const payload = {
       contents: [
         {
@@ -212,20 +233,7 @@ app.post("/api/parse-key", async (req, res) => {
       ]
     };
 
-    const fetchResponse = await fetch(fetchUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!fetchResponse.ok) {
-      const errText = await fetchResponse.text();
-      throw new Error(`Gemini API Error: ${fetchResponse.status} - ${errText}`);
-    }
-
-    const data: any = await fetchResponse.json();
+    const data: any = await callGemini(payload, apiKey);
     const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     res.json({ text: textResponse });
 
