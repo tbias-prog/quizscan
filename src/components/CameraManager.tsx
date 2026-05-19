@@ -10,6 +10,44 @@ interface CameraManagerProps {
   confirmLabel?: string;
 }
 
+const compressImage = (dataUrl: string, maxDimension = 1200, quality = 0.8): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxDimension) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } else {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => {
+      resolve(dataUrl);
+    };
+    img.src = dataUrl;
+  });
+};
+
 export default function CameraManager({ onCapture, onCancel, title = "Scanner View", confirmLabel = "Confirm Capture" }: CameraManagerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,8 +99,10 @@ export default function CameraManager({ onCapture, onCancel, title = "Scanner Vi
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg');
-        setCapturedImage(dataUrl);
-        stopCamera();
+        compressImage(dataUrl).then(compressed => {
+          setCapturedImage(compressed);
+          stopCamera();
+        });
       }
     }
   };
@@ -87,8 +127,10 @@ export default function CameraManager({ onCapture, onCancel, title = "Scanner Vi
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setCapturedImage(reader.result as string);
-        stopCamera();
+        compressImage(reader.result as string).then(compressed => {
+          setCapturedImage(compressed);
+          stopCamera();
+        });
       };
       reader.readAsDataURL(file);
     }
