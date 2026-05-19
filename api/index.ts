@@ -77,21 +77,27 @@ app.post("/api/grade", async (req, res) => {
     }
 
     const prompt = `
-      You are an expert academic grader. Your task is to grade a student's quiz paper based on a provided answer key.
+      You are an expert academic grader. Your task is to perform an exceptionally rigorous, high-accuracy grading of a student's handwritten or printed quiz paper based on the provided ANSWER KEY.
       
       STUDENT NAME (if detectable from paper, otherwise use the one provided): ${studentNameInput || "Unknown"}
       
       ANSWER KEY:
       ${answerKey}
       
-      INSTRUCTIONS:
-      1. Extract the student's name from the top of the paper if it exists and differs from the provided input.
-      2. Compare the student's answers in the image to the answer key.
-      3. Calculate a total score based on the number of correct answers.
-      4. Provide a reasoning for each marked question (e.g., "Correct", "Incorrect - expected X", "Partially correct").
-      5. Return the result strictly in JSON format.
+      CRITICAL INSTRUCTIONS:
+      1. Carefully extract the student's name from the top of the paper if it exists and differs from the provided input.
+      2. Analyze the student's written answers in the image. Evaluate every single question with extreme precision.
+      3. For each question:
+         - Identify the student's written answer.
+         - Compare it to the correct answer in the ANSWER KEY.
+         - An answer is correct (isCorrect: true) ONLY if it matches the answer key (case-insensitive for letters/options, and semantically equivalent for short text answers).
+         - If the student's answer does not match the expected answer in the ANSWER KEY, it MUST be marked as incorrect (isCorrect: false). Never mark an incorrect answer as correct!
+      4. Calculate the totalScore as the exact count of correct answers (questions where isCorrect is true).
+      5. Calculate maxScore as the total number of questions listed in the ANSWER KEY.
+      6. Provide a professional, detailed explanation in the 'feedback' field explaining why the answer is correct or incorrect.
+      7. Return the final result strictly as a single JSON object conforming to the schema below. Do not include any markdown format blocks or conversational text around the JSON.
 
-      Return a JSON object with this schema:
+      JSON SCHEMA:
       {
         "studentName": "string",
         "totalScore": number,
