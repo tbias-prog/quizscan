@@ -156,7 +156,15 @@ export default function App() {
         body: JSON.stringify({ image: imageBase64 }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type");
+      let data: any = null;
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error: ${res.status}`);
+      }
+
       if (res.ok) {
         setAnswerKey(data.text);
       } else {
@@ -184,7 +192,15 @@ export default function App() {
         }),
       });
 
-      const result: GradingResult = await res.json();
+      const contentType = res.headers.get("content-type");
+      let result: any = null;
+      if (contentType && contentType.includes("application/json")) {
+        result = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error: ${res.status}`);
+      }
+
       if (res.ok) {
         setCurrentResult(result);
         setGradingStatus('done');
