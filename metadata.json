@@ -1,0 +1,10 @@
+{
+  "name": "QuizScan-AI",
+  "description": "Automated quiz grading using Gemini AI Vision with real-time Supabase sync.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
