@@ -1,22 +1,11 @@
 import express from "express";
 import path from "path";
-import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
-
-// Initialize Gemini
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -128,15 +117,44 @@ app.post("/api/grade", async (req, res) => {
       }
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: { parts: [imagePart, { text: prompt }] },
-      config: {
+    const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const payload = {
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: image.split(',')[1] || image,
+              }
+            },
+            {
+              text: prompt,
+            }
+          ]
+        }
+      ],
+      generationConfig: {
         responseMimeType: "application/json",
       }
+    };
+
+    const fetchResponse = await fetch(fetchUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    const gradingResult = JSON.parse(response.text || "{}");
+    if (!fetchResponse.ok) {
+      const errText = await fetchResponse.text();
+      throw new Error(`Gemini API Error: ${fetchResponse.status} - ${errText}`);
+    }
+
+    const data: any = await fetchResponse.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const gradingResult = JSON.parse(textResponse);
     res.json(gradingResult);
 
   } catch (error: any) {
@@ -184,12 +202,41 @@ app.post("/api/parse-key", async (req, res) => {
       Return ONLY the plain text of the extracted keys, no conversational filler.
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: { parts: [imagePart, { text: prompt }] },
+    const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const payload = {
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: image.split(',')[1] || image,
+              }
+            },
+            {
+              text: prompt,
+            }
+          ]
+        }
+      ]
+    };
+
+    const fetchResponse = await fetch(fetchUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    res.json({ text: response.text });
+    if (!fetchResponse.ok) {
+      const errText = await fetchResponse.text();
+      throw new Error(`Gemini API Error: ${fetchResponse.status} - ${errText}`);
+    }
+
+    const data: any = await fetchResponse.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    res.json({ text: textResponse });
 
   } catch (error: any) {
     console.error("Parse key error:", error);
